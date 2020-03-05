@@ -1,3 +1,2 @@
-pytorch>=1.0.0
 tensorboard_logger
 tqdm

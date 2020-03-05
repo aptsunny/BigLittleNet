@@ -76,7 +76,7 @@ def get_augmentor(is_train, image_size, strong=False):
             transforms.RandomHorizontalFlip()
         ]
     else:
-        augments += [
+        augments += [ #
             transforms.Resize(int(image_size / 0.875 + 0.5) if image_size ==
                               224 else image_size, interpolation=Image.BILINEAR),
             transforms.CenterCrop(image_size)

@@ -17,19 +17,17 @@ from ._model_urls import model_urls
 
 __all__ = ['blresnet_model']
 
-
+# bottleneck
 class Bottleneck(nn.Module):
     expansion = 4
-
-    def __init__(self, inplanes, planes, stride=1, downsample=None, last_relu=True):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, last_relu=True):# 64 , 256
         super(Bottleneck, self).__init__()
-
-        self.conv1 = nn.Conv2d(inplanes, planes // self.expansion, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes // self.expansion)
-        self.conv2 = nn.Conv2d(planes // self.expansion, planes // self.expansion, kernel_size=3, stride=stride,
+        self.conv1 = nn.Conv2d(inplanes, planes // self.expansion, kernel_size=1, bias=False)# 64, 64
+        self.bn1 = nn.BatchNorm2d(planes // self.expansion)# 64
+        self.conv2 = nn.Conv2d(planes // self.expansion, planes // self.expansion, kernel_size=3, stride=stride,# 64, 64
                                padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes // self.expansion)
-        self.conv3 = nn.Conv2d(planes // self.expansion, planes, kernel_size=1, bias=False)
+        self.conv3 = nn.Conv2d(planes // self.expansion, planes, kernel_size=1, bias=False)# 64 , 256
         self.bn3 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -59,12 +57,14 @@ class Bottleneck(nn.Module):
 
         return out
 
-
+# bl模块
 class bLModule(nn.Module):
     def __init__(self, block, in_channels, out_channels, blocks, alpha, beta, stride):
         super(bLModule, self).__init__()
 
         self.relu = nn.ReLU(inplace=True)
+        # 64, 256
+        #
         self.big = self._make_layer(block, in_channels, out_channels, blocks - 1, 2, last_relu=False)
         self.little = self._make_layer(block, in_channels, out_channels // alpha, max(1, blocks // beta - 1))
         self.little_e = nn.Sequential(
@@ -73,13 +73,14 @@ class bLModule(nn.Module):
 
         self.fusion = self._make_layer(block, out_channels, out_channels, 1, stride=stride)
 
-    def _make_layer(self, block, inplanes, planes, blocks, stride=1, last_relu=True):
+    def _make_layer(self, block, inplanes, planes, blocks, stride=1, last_relu=True):# 64 , 256
         downsample = []
         if stride != 1:
             downsample.append(nn.AvgPool2d(3, stride=2, padding=1))
-        if inplanes != planes:
+        if inplanes != planes:# 64, 256
             downsample.append(nn.Conv2d(inplanes, planes, kernel_size=1, stride=1, bias=False))
             downsample.append(nn.BatchNorm2d(planes))
+
         downsample = None if downsample == [] else nn.Sequential(*downsample)
         layers = []
         if blocks == 1:
@@ -113,8 +114,10 @@ class bLResNet(nn.Module):
                                bias=False)
         self.bn1 = nn.BatchNorm2d(num_channels[0])
         self.relu = nn.ReLU(inplace=True)
+
         self.b_conv0 = nn.Conv2d(num_channels[0], num_channels[0], kernel_size=3, stride=2, padding=1, bias=False)
         self.bn_b0 = nn.BatchNorm2d(num_channels[0])
+
         self.l_conv0 = nn.Conv2d(num_channels[0], num_channels[0] // alpha,
                                  kernel_size=3, stride=1, padding=1, bias=False)
         self.bn_l0 = nn.BatchNorm2d(num_channels[0] // alpha)
@@ -127,14 +130,15 @@ class bLResNet(nn.Module):
         self.bl_init = nn.Conv2d(num_channels[0], num_channels[0], kernel_size=1, stride=1, bias=False)
         self.bn_bl_init = nn.BatchNorm2d(num_channels[0])
 
-        self.layer1 = bLModule(block, num_channels[0], num_channels[0] *
-                               block.expansion, layers[0], alpha, beta, stride=2)
-        self.layer2 = bLModule(block, num_channels[0] * block.expansion,
-                               num_channels[1] * block.expansion, layers[1], alpha, beta, stride=2)
-        self.layer3 = bLModule(block, num_channels[1] * block.expansion,
-                               num_channels[2] * block.expansion, layers[2], alpha, beta, stride=1)
-        self.layer4 = self._make_layer(
-            block, num_channels[2] * block.expansion, num_channels[3] * block.expansion, layers[3], stride=2)
+        # bL模块
+        # 64 , 256,
+        # 56->28
+        self.layer1 = bLModule(block, num_channels[0], num_channels[0] * block.expansion, layers[0], alpha, beta, stride=2)
+        self.layer2 = bLModule(block, num_channels[0] * block.expansion, num_channels[1] * block.expansion, layers[1], alpha, beta, stride=2)
+        self.layer3 = bLModule(block, num_channels[1] * block.expansion, num_channels[2] * block.expansion, layers[2], alpha, beta, stride=1)
+
+        self.layer4 = self._make_layer(block, num_channels[2] * block.expansion, num_channels[3] * block.expansion, layers[3], stride=2)
+
         self.gappool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(num_channels[3] * block.expansion, num_classes)
 
@@ -174,6 +178,7 @@ class bLResNet(nn.Module):
 
         bx = self.b_conv0(x)
         bx = self.bn_b0(bx)
+
         lx = self.l_conv0(x)
         lx = self.bn_l0(lx)
         lx = self.relu(lx)
@@ -182,6 +187,7 @@ class bLResNet(nn.Module):
         lx = self.relu(lx)
         lx = self.l_conv2(lx)
         lx = self.bn_l2(lx)
+
         x = self.relu(bx + lx)
         x = self.bl_init(x)
         x = self.bn_bl_init(x)
@@ -193,6 +199,7 @@ class bLResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.gappool(x)
+        # uu = x.size(0), -1
         x = x.view(x.size(0), -1)
         x = self.fc(x)
 
@@ -200,12 +207,12 @@ class bLResNet(nn.Module):
 
 
 def blresnet_model(depth, alpha, beta, num_classes=1000, pretrained=False):
-    layers = {
+    layers = {#main
         50: [3, 4, 6, 3],
         101: [4, 8, 18, 3],
         152: [5, 12, 30, 3]
     }[depth]
-    model = bLResNet(Bottleneck, layers, alpha, beta, num_classes)
+    model = bLResNet(Bottleneck, layers, alpha, beta, num_classes)# 定义model
 
     if pretrained:
         url = model_urls['blresnet-{}-a{}-b{}'.format(depth, alpha, beta)]

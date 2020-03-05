@@ -27,6 +27,10 @@ import tensorboard_logger
 from models import (blresnext_model, blresnet_model, blseresnext_model)
 from imagenet_utils import get_augmentor, get_imagenet_dataflow, train, validate
 
+# ignore warning
+import warnings
+warnings.filterwarnings('ignore')
+
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--backbone_net', default='blresnext', type=str, help='backbone network',
                     choices=['blresnext', 'blresnet', 'blseresnext'])
@@ -81,7 +85,7 @@ def main():
         arch_name = "ImageNet-bLResNeXt-{}-{}x{}d-a{}-b{}".format(
             args.depth, args.cardinality, args.basewidth, args.alpha, args.beta)
         backbone_setting = [args.depth, args.basewidth, args.cardinality, args.alpha, args.beta]
-    elif args.backbone_net == 'blresnet':
+    elif args.backbone_net == 'blresnet': # resnet->blresnet
         backbone = blresnet_model
         arch_name = "ImageNet-bLResNet-{}-a{}-b{}".format(args.depth, args.alpha, args.beta)
         backbone_setting = [args.depth, args.alpha, args.beta]
@@ -90,7 +94,7 @@ def main():
         arch_name = "ImageNet-bLSEResNeXt-{}-{}x{}d-a{}-b{}".format(
             args.depth, args.cardinality, args.basewidth, args.alpha, args.beta)
         backbone_setting = [args.depth, args.basewidth, args.cardinality, args.alpha, args.beta]
-        strong_augmentor = True
+        strong_augmentor = True # 此数据增强策略用于 blseresnext
     else:
         raise ValueError("Unsupported backbone.")
 
@@ -112,7 +116,7 @@ def main():
     # Data loading code
     valdir = os.path.join(args.data, 'val')
     val_loader = get_imagenet_dataflow(False, valdir, args.batch_size, get_augmentor(
-        False, args.input_shape, strong_augmentor), workers=args.workers)
+        False, args.input_shape, strong_augmentor), workers=args.workers) # get_augmentor # get_imagenet_dataflow
 
     log_folder = os.path.join(args.logdir, arch_name)
     if not os.path.exists(log_folder):
@@ -225,3 +229,5 @@ def save_checkpoint(state, is_best, filepath=''):
 
 if __name__ == '__main__':
     main()
+
+
